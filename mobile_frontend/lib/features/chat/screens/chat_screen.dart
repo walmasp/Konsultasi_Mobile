@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../core/network/api_client.dart'; // Sesuaikan folder jika berbeda
+import 'package:socket_io_client/socket_io_client.dart' as IO;
 
 // ─── Sanctuary Design Tokens ────────────────────────────────────────────────
 const _kPrimary      = Color(0xFF5C6BC0);
@@ -27,19 +29,60 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
-  // Data dummy sementara agar UI bisa dites
-  final List<Map<String, dynamic>> _messages = [
-    {
-      'message_text':
-          'Halo, ini ruang konseling anonim Anda. Ada yang ingin diceritakan?',
-      'is_me': false,
-    }
-  ];
+  // 1. Tambahkan variabel Socket
+  late IO.Socket socket;
+
+  // Data dummy dikosongkan agar chat murni dari database/socket
+  final List<Map<String, dynamic>> _messages = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _initSocket(); // 2. Panggil inisialisasi socket saat layar dibuka
+  }
+
+  // 3. Fungsi untuk menghubungkan Flutter ke Node.js via WebSocket
+  void _initSocket() {
+    String socketUrl = ApiClient.baseUrl.replaceAll('/api', '');
+    socket = IO.io(
+      socketUrl,
+      IO.OptionBuilder()
+          .setTransports(['websocket'])
+          .disableAutoConnect()
+          .build(),
+    );
+
+    socket.connect();
+
+    socket.onConnect((_) {
+      debugPrint('Terhubung ke Server Chat WebSocket');
+      // Masuk ke room khusus menggunakan bookingId
+      // (Pastikan widget.bookingId bertipe String, jika int langsung pakai saja)
+      socket.emit('join_room', int.parse(widget.bookingId)); 
+    });
+
+    // 4. Mendengarkan pesan masuk dari Psikolog (Web Temanmu)
+    socket.on('receive_message', (data) {
+      if (!mounted) return;
+      
+      // Jika yang mengirim adalah psikolog, tambahkan ke layar (is_me: false)
+      if (data['sender_role'] == 'psikolog') {
+        setState(() {
+          _messages.add({
+            'message_text': data['text'],
+            'is_me': false,
+          });
+        });
+        _scrollToBottom();
+      }
+    });
+  }
 
   void _kirimPesan() {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
 
+    // Tampilkan di layar lokal kita sendiri (Kanan)
     setState(() {
       _messages.add({
         'message_text': text,
@@ -47,9 +90,20 @@ class _ChatScreenState extends State<ChatScreen> {
       });
     });
 
-    _messageController.clear();
+    // 5. Tembakkan pesan ke backend & MongoDB
+    socket.emit('send_message', {
+      'booking_id': int.parse(widget.bookingId),
+      'sender_id': 99, // Ganti dengan ID mahasiswa asli dari sesi login nanti
+      'sender_role': 'mahasiswa',
+      'text': text,
+    });
 
-    // Auto-scroll to bottom
+    _messageController.clear();
+    _scrollToBottom();
+  }
+
+  // Pisahkan logika scroll agar bisa dipanggil juga saat pesan masuk
+  void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
@@ -63,6 +117,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    // 6. Putuskan koneksi saat keluar dari layar chat
+    socket.disconnect();
+    socket.dispose();
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();

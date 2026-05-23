@@ -78,17 +78,21 @@ class _AuthScreenState extends State<AuthScreen> {
             'password': savedPassword,
           });
 
-          if (response.statusCode == 200) {
-            // Simpan Token JWT baru ke SharedPreferences
-            final prefs = await SharedPreferences.getInstance();
-            await prefs.setString('jwt_token', response.data['token']);
-            await prefs.setString('username', response.data['username']);
+          // --- GANTI BAGIAN INI ---
+        if (response.statusCode == 200) {
+  // Simpan Token JWT
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('jwt_token', response.data['token']);
+  
+  // Perhatikan: Akses ke 'user' terlebih dahulu
+          await prefs.setString('username', response.data['user']['username']);
+          await prefs.setInt('user_id', response.data['user']['id']); // Sangat penting untuk fitur Chat nanti
 
-            if (mounted) {
-              Navigator.pushReplacement(
-                context, MaterialPageRoute(builder: (context) => const HomeScreen()));
-            }
-          }
+        if (mounted) {
+        Navigator.pushReplacement(
+          context, MaterialPageRoute(builder: (context) => const HomeScreen()));
+        }
+      }
         }
       }
     } on DioException {
@@ -111,26 +115,26 @@ class _AuthScreenState extends State<AuthScreen> {
     setState(() => _isLoading = true);
     try {
       if (_isLoginMode) {
-        // PROSES LOGIN
-        final response = await _api.dio.post('/auth/login', data: {
-          'username': _usernameController.text,
-          'password': _passwordController.text,
-        });
-        
-        // Simpan token ke SharedPreferences (Untuk otorisasi API)
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('jwt_token', response.data['token']);
-        await prefs.setString('username', response.data['username']);
+  // PROSES LOGIN
+  final response = await _api.dio.post('/auth/login', data: {
+    'username': _usernameController.text,
+    'password': _passwordController.text,
+  });
+  
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setString('jwt_token', response.data['token']);
+  await prefs.setString('username', response.data['user']['username']); // Dulu: ['username']
+  await prefs.setInt('user_id', response.data['user']['id']);
 
-        // Simpan kredensial ke Secure Storage (Untuk Biometrik berikutnya)
-        await _secureStorage.write(key: 'saved_username', value: _usernameController.text);
-        await _secureStorage.write(key: 'saved_password', value: _passwordController.text);
+  // Simpan kredensial ke Secure Storage
+  await _secureStorage.write(key: 'saved_username', value: _usernameController.text);
+  await _secureStorage.write(key: 'saved_password', value: _passwordController.text);
 
-        if (mounted) {
-          Navigator.pushReplacement(
-            context, MaterialPageRoute(builder: (context) => const HomeScreen()));
-        }
-      } else {
+  if (mounted) {
+    Navigator.pushReplacement(
+      context, MaterialPageRoute(builder: (context) => const HomeScreen()));
+  }
+} else {
         // PROSES REGISTER
         await _api.dio.post('/auth/register', data: {
           'username': _usernameController.text,
@@ -144,8 +148,13 @@ class _AuthScreenState extends State<AuthScreen> {
         });
       }
     } on DioException catch (e) {
-      _showSnackbar(e.response?.data['message'] ?? 'Terjadi kesalahan server');
-    } finally {
+       print("=== ERROR KONEKSI ===");
+  print("Tipe Error: ${e.type}"); // Ini akan ngasih tau apakah Timeout atau Connection Refused
+  print("Pesan Asli: ${e.message}");
+  print("Status Code: ${e.response?.statusCode}");
+  print("Pesan Server: ${e.response?.data}");
+  print("=====================");
+     } finally {
       setState(() => _isLoading = false);
     }
   }
