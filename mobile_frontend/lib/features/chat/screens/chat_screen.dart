@@ -1,5 +1,7 @@
+import 'dart:convert'; // Tambahkan ini
+import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
-import '../../../core/network/api_client.dart'; // Sesuaikan folder jika berbeda
+import '../../../core/network/api_client.dart'; // Di-comment dulu agar tidak bentrok IP-nya
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 
 // ─── Sanctuary Design Tokens ────────────────────────────────────────────────
@@ -33,17 +35,44 @@ class _ChatScreenState extends State<ChatScreen> {
   late IO.Socket socket;
 
   // Data dummy dikosongkan agar chat murni dari database/socket
-  final List<Map<String, dynamic>> _messages = [];
+  List<Map<String, dynamic>> _messages = [];
 
   @override
   void initState() {
     super.initState();
-    _initSocket(); // 2. Panggil inisialisasi socket saat layar dibuka
+    _loadChatHistory(); // 1. Ambil history dulu
+    _initSocket();      // 2. Baru konek socket
+  }
+
+  // Fungsi baru untuk ambil history dari MongoDB
+  Future<void> _loadChatHistory() async {
+    try {
+      final response = await http.get(Uri.parse(
+          '${ApiClient.baseUrl.replaceAll('/api', '')}/api/chat/${widget.bookingId}'));
+      
+      if (response.statusCode == 200) {
+        List<dynamic> data = jsonDecode(response.body);
+        setState(() {
+          _messages = data.map((msg) {
+            return {
+              'message_text': msg['message_text'],
+              'is_me': msg['sender_role'] == 'mahasiswa', // Sesuaikan logika peran
+            };
+          }).toList();
+        });
+        _scrollToBottom();
+      }
+    } catch (e) {
+      debugPrint("Gagal memuat riwayat: $e");
+    }
   }
 
   // 3. Fungsi untuk menghubungkan Flutter ke Node.js via WebSocket
+  // ... (Bagian atas file chat_screen.dart tidak berubah)
+
+  // 3. Fungsi untuk menghubungkan Flutter ke Node.js via WebSocket
   void _initSocket() {
-    String socketUrl = ApiClient.baseUrl.replaceAll('/api', '');
+    String socketUrl = 'http://192.168.100.76:3000'; // Sesuaikan IP laptopmu
     socket = IO.io(
       socketUrl,
       IO.OptionBuilder()
@@ -56,20 +85,17 @@ class _ChatScreenState extends State<ChatScreen> {
 
     socket.onConnect((_) {
       debugPrint('Terhubung ke Server Chat WebSocket');
-      // Masuk ke room khusus menggunakan bookingId
-      // (Pastikan widget.bookingId bertipe String, jika int langsung pakai saja)
-      socket.emit('join_room', int.parse(widget.bookingId)); 
+      socket.emit('join_room', widget.bookingId.toString()); 
     });
 
-    // 4. Mendengarkan pesan masuk dari Psikolog (Web Temanmu)
+    // 4. Mendengarkan pesan masuk dari Psikolog
     socket.on('receive_message', (data) {
       if (!mounted) return;
       
-      // Jika yang mengirim adalah psikolog, tambahkan ke layar (is_me: false)
       if (data['sender_role'] == 'psikolog') {
         setState(() {
           _messages.add({
-            'message_text': data['text'],
+            'message_text': data['text'], // Data dari server dikirim dengan key 'text'
             'is_me': false,
           });
         });
@@ -82,7 +108,6 @@ class _ChatScreenState extends State<ChatScreen> {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
 
-    // Tampilkan di layar lokal kita sendiri (Kanan)
     setState(() {
       _messages.add({
         'message_text': text,
@@ -90,17 +115,18 @@ class _ChatScreenState extends State<ChatScreen> {
       });
     });
 
-    // 5. Tembakkan pesan ke backend & MongoDB
+    // 5. Tembakkan pesan ke backend
     socket.emit('send_message', {
       'booking_id': int.parse(widget.bookingId),
-      'sender_id': 99, // Ganti dengan ID mahasiswa asli dari sesi login nanti
+      'sender_id': 99, 
       'sender_role': 'mahasiswa',
-      'text': text,
+      'text': text, // Mengirim dengan key 'text'
     });
 
     _messageController.clear();
     _scrollToBottom();
   }
+
 
   // Pisahkan logika scroll agar bisa dipanggil juga saat pesan masuk
   void _scrollToBottom() {
@@ -201,19 +227,11 @@ class _ChatScreenState extends State<ChatScreen> {
                                 width: 7,
                                 height: 7,
                                 decoration: const BoxDecoration(
-                                  color: Color(0xFFFF9500),
+                                  color: Color.fromARGB(255, 0, 255, 204),
                                   shape: BoxShape.circle,
                                 ),
                               ),
                               const SizedBox(width: 5),
-                              Text(
-                                'Mode Offline (UI Only)',
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.70),
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
                             ],
                           ),
                         ],
@@ -334,12 +352,12 @@ class _ChatScreenState extends State<ChatScreen> {
                       controller: _messageController,
                       style: const TextStyle(
                           color: _kTextPrimary, fontSize: 15),
-                      decoration: InputDecoration(
+                      decoration: const InputDecoration(
                         hintText: 'Ketik pesan rahasia...',
-                        hintStyle: const TextStyle(
+                        hintStyle: TextStyle(
                             color: _kTextSub, fontSize: 14),
                         border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(
+                        contentPadding: EdgeInsets.symmetric(
                             horizontal: 20, vertical: 13),
                       ),
                       textInputAction: TextInputAction.send,
@@ -406,8 +424,8 @@ class _ChatBubble extends StatelessWidget {
               width: 30,
               height: 30,
               margin: const EdgeInsets.only(right: 8, bottom: 2),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
                   colors: [Color(0xFF7986CB), _kPrimary],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
