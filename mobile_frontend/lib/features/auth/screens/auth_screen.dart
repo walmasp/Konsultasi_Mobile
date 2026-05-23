@@ -6,6 +6,15 @@ import 'package:dio/dio.dart';
 import '../../../core/network/api_client.dart';
 import '../../booking/screens/home_screen.dart';
 
+// ─── Sanctuary Design Tokens ────────────────────────────────────────────────
+const _kPrimary      = Color(0xFF5C6BC0);
+const _kPrimaryLight = Color(0xFFE8EAF6);
+const _kAccent       = Color(0xFF26A69A);
+const _kBg           = Color(0xFFF0F2F8);
+const _kCardBg       = Color(0xFFFFFFFF);
+const _kTextPrimary  = Color(0xFF1C1F33);
+const _kTextSub      = Color(0xFF6B7280);
+
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
 
@@ -161,9 +170,11 @@ class _AuthScreenState extends State<AuthScreen> {
   void _showSnackbar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message), 
+        content: Text(message, style: const TextStyle(fontWeight: FontWeight.w500)),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        backgroundColor: _kTextPrimary,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        margin: const EdgeInsets.all(16),
       ),
     );
   }
@@ -171,119 +182,385 @@ class _AuthScreenState extends State<AuthScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+      backgroundColor: _kBg,
+      body: Stack(
+        children: [
+          // ── Decorative gradient blobs ──────────────────────────────────
+          Positioned(
+            top: -80,
+            right: -60,
+            child: Container(
+              width: 260,
+              height: 260,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [_kPrimary.withOpacity(0.18), Colors.transparent],
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -100,
+            left: -80,
+            child: Container(
+              width: 320,
+              height: 320,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [_kAccent.withOpacity(0.12), Colors.transparent],
+                ),
+              ),
+            ),
+          ),
+          // ── Main Content ───────────────────────────────────────────────
+          SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: 32),
+                  if (_hasSavedAccount && !_forceManualLogin)
+                    _buildBiometricView()
+                  else
+                    _buildManualLoginView(),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── TAMPILAN 1: BIOMETRIK ──────────────────────────────────────────────────
+  Widget _buildBiometricView() {
+    return Column(
+      children: [
+        // Fingerprint glow badge
+        Container(
+          width: 110,
+          height: 110,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: const LinearGradient(
+              colors: [Color(0xFF7986CB), _kPrimary],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: _kPrimary.withOpacity(0.38),
+                blurRadius: 30,
+                offset: const Offset(0, 12),
+              ),
+            ],
+          ),
+          child: const Icon(Icons.fingerprint_rounded, size: 58, color: Colors.white),
+        ),
+        const SizedBox(height: 36),
+        const Text(
+          'Selamat Datang\nKembali',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.w800,
+            color: _kTextPrimary,
+            height: 1.2,
+            letterSpacing: -0.5,
+          ),
+        ),
+        const SizedBox(height: 10),
+        // Username chip
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+          decoration: BoxDecoration(
+            color: _kPrimaryLight,
+            borderRadius: BorderRadius.circular(40),
+          ),
+          child: Text(
+            _lastUsername,
+            style: const TextStyle(
+              fontSize: 16,
+              color: _kPrimary,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ),
+        const SizedBox(height: 52),
+
+        // Biometric Button
+        _GradientButton(
+          onPressed: _isLoading ? null : _authenticateBiometric,
+          isLoading: _isLoading,
+          child: const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const SizedBox(height: 40),
-              
-              // ==========================================
-              // TAMPILAN 1: ADA AKUN TERSIMPAN (BIOMETRIK)
-              // ==========================================
-              if (_hasSavedAccount && !_forceManualLogin) ...[
-                const Icon(Icons.fingerprint_rounded, size: 90, color: Color(0xFF007AFF)),
-                const SizedBox(height: 32),
-                const Text(
-                  'Selamat Datang Kembali',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: -0.5),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _lastUsername,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 20, color: Color(0xFF007AFF), fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 48),
-                
-                ElevatedButton(
-                  onPressed: _isLoading ? null : _authenticateBiometric,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF007AFF),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 18),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                    elevation: 0,
-                  ),
-                  child: _isLoading 
-                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      : const Text('Masuk dengan Sidik Jari', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                ),
-                const SizedBox(height: 16),
-                TextButton(
-                  onPressed: _clearSession,
-                  child: const Text('Login dengan Akun Lain', style: TextStyle(color: Colors.black54)),
-                ),
-              ] 
-              
-              // ==========================================
-              // TAMPILAN 2: BELUM ADA AKUN / MANUAL LOGIN
-              // ==========================================
-              else ...[
-                const Icon(Icons.shield_rounded, size: 80, color: Color(0xFF007AFF)),
-                const SizedBox(height: 24),
-                Text(
-                  _isLoginMode ? 'Masuk Sesi Anonim' : 'Buat ID Anonim',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, letterSpacing: -0.5),
-                ),
-                const SizedBox(height: 40),
-                
-                TextField(
-                  controller: _usernameController,
-                  decoration: InputDecoration(
-                    hintText: 'Username Samaran',
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _passwordController,
-                  obscureText: _obscurePassword,
-                  decoration: InputDecoration(
-                    hintText: 'Password',
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-                    suffixIcon: IconButton(
-                      icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility, color: Colors.grey),
-                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 32),
-                
-                ElevatedButton(
-                  onPressed: _isLoading ? null : _submitForm,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF007AFF),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 18),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                    elevation: 0,
-                  ),
-                  child: _isLoading 
-                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      : Text(_isLoginMode ? 'Login' : 'Daftar Akun Anonim', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                ),
-                
-                TextButton(
-                  onPressed: () => setState(() {
-                    _isLoginMode = !_isLoginMode;
-                    _passwordController.clear();
-                  }),
-                  child: Text(_isLoginMode ? 'Belum punya ID? Buat Akun' : 'Sudah punya ID? Login', style: const TextStyle(color: Color(0xFF007AFF))),
-                ),
-              ],
+              Icon(Icons.fingerprint_rounded, size: 20),
+              SizedBox(width: 10),
+              Text('Masuk dengan Sidik Jari',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
             ],
           ),
         ),
+        const SizedBox(height: 16),
+        TextButton(
+          onPressed: _clearSession,
+          child: const Text(
+            'Login dengan Akun Lain',
+            style: TextStyle(color: _kTextSub, fontWeight: FontWeight.w500),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── TAMPILAN 2: MANUAL LOGIN / REGISTER ───────────────────────────────────
+  Widget _buildManualLoginView() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Shield icon with gradient
+        Center(
+          child: Container(
+            width: 96,
+            height: 96,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const LinearGradient(
+                colors: [Color(0xFF7986CB), _kPrimary],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: _kPrimary.withOpacity(0.32),
+                  blurRadius: 28,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: const Icon(Icons.shield_rounded, size: 50, color: Colors.white),
+          ),
+        ),
+        const SizedBox(height: 28),
+        Text(
+          _isLoginMode ? 'Masuk Sesi\nAnonim' : 'Buat ID\nAnonim',
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 30,
+            fontWeight: FontWeight.w800,
+            color: _kTextPrimary,
+            height: 1.15,
+            letterSpacing: -0.6,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          _isLoginMode
+              ? 'Identitas aslimu tidak akan pernah diketahui'
+              : 'Buat akun tanpa nama asli atau email',
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 13, color: _kTextSub, height: 1.4),
+        ),
+        const SizedBox(height: 40),
+
+        // Input Card
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: _kCardBg,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: _kPrimary.withOpacity(0.07),
+                blurRadius: 24,
+                offset: const Offset(0, 8),
+              ),
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              _StyledTextField(
+                controller: _usernameController,
+                hint: 'Username Samaran',
+                icon: Icons.person_outline_rounded,
+              ),
+              const SizedBox(height: 14),
+              _StyledTextField(
+                controller: _passwordController,
+                hint: 'Password',
+                icon: Icons.lock_outline_rounded,
+                obscureText: _obscurePassword,
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscurePassword
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
+                    color: _kTextSub,
+                    size: 20,
+                  ),
+                  onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+
+        _GradientButton(
+          onPressed: _isLoading ? null : _submitForm,
+          isLoading: _isLoading,
+          child: Text(
+            _isLoginMode ? 'Login' : 'Daftar Akun Anonim',
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        TextButton(
+          onPressed: () => setState(() {
+            _isLoginMode = !_isLoginMode;
+            _passwordController.clear();
+          }),
+          child: RichText(
+            text: TextSpan(
+              style: const TextStyle(fontSize: 14),
+              children: [
+                TextSpan(
+                  text: _isLoginMode
+                      ? 'Belum punya ID? '
+                      : 'Sudah punya ID? ',
+                  style: const TextStyle(color: _kTextSub),
+                ),
+                TextSpan(
+                  text: _isLoginMode ? 'Buat Akun' : 'Login',
+                  style: const TextStyle(
+                    color: _kPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+}
+
+// ── Shared UI Components ───────────────────────────────────────────────────
+
+class _GradientButton extends StatelessWidget {
+  final VoidCallback? onPressed;
+  final bool isLoading;
+  final Widget child;
+
+  const _GradientButton({
+    required this.onPressed,
+    required this.child,
+    this.isLoading = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 56,
+      decoration: BoxDecoration(
+        gradient: onPressed == null
+            ? LinearGradient(colors: [Colors.grey[300]!, Colors.grey[300]!])
+            : const LinearGradient(
+                colors: [Color(0xFF7986CB), _kPrimary],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: onPressed == null
+            ? []
+            : [
+                BoxShadow(
+                  color: _kPrimary.withOpacity(0.35),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: onPressed,
+          child: Center(
+            child: isLoading
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                        color: Colors.white, strokeWidth: 2.5),
+                  )
+                : DefaultTextStyle(
+                    style: const TextStyle(color: Colors.white),
+                    child: IconTheme(
+                      data: const IconThemeData(color: Colors.white),
+                      child: child,
+                    ),
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StyledTextField extends StatelessWidget {
+  final TextEditingController controller;
+  final String hint;
+  final IconData icon;
+  final bool obscureText;
+  final Widget? suffixIcon;
+
+  const _StyledTextField({
+    required this.controller,
+    required this.hint,
+    required this.icon,
+    this.obscureText = false,
+    this.suffixIcon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      obscureText: obscureText,
+      style: const TextStyle(
+          color: _kTextPrimary, fontSize: 15, fontWeight: FontWeight.w500),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: const TextStyle(color: _kTextSub, fontSize: 14),
+        prefixIcon: Icon(icon, color: _kPrimary, size: 20),
+        suffixIcon: suffixIcon,
+        filled: true,
+        fillColor: _kBg,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: _kPrimary, width: 1.5),
+        ),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       ),
     );
   }
