@@ -2,11 +2,11 @@ const mongoose = require('mongoose');
 
 const ChatSchema = new mongoose.Schema({
     booking_id: {
-        type: Number, // Menghubungkan ke ID Transaksi di MySQL
+        type: Number, 
         required: true
     },
     sender_id: {
-        type: Number, // ID Pengirim (bisa mahasiswa atau psikolog)
+        type: Number, 
         required: true
     },
     sender_role: {
@@ -15,7 +15,7 @@ const ChatSchema = new mongoose.Schema({
         required: true
     },
     message_text: {
-        type: String, // Teks curhatan mahasiswa
+        type: String, 
         required: true
     },
     timestamp: {

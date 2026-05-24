@@ -46,27 +46,27 @@ io.on('connection', (socket) => {
 
     // Mendengarkan saat ada pesan dikirim (dari Mahasiswa/Psikolog)
     socket.on('send_message', async (data) => {
-        try {
-            // Simpan pesan secara otomatis ke MongoDB
-            const newChat = new Chat({
-                booking_id: data.booking_id,
-                sender_id: data.sender_id,
-                sender_role: data.sender_role,
-                message_text: data.text 
-            });
-            await newChat.save();
+    try {
+        // Simpan ke MongoDB dengan memetakan 'text' ke 'message_text'
+        const chatBaru = new Chat({
+            booking_id: data.booking_id,
+            sender_id: data.sender_id,
+            sender_role: data.sender_role,
+            message_text: data.text // <--- INI KUNCI PERBAIKANNYA
+        });
 
-            // Pancarkan pesan ke user lain di kamar yang sama secara real-time
-            io.to(data.booking_id).emit('receive_message', {
-                text: data.text,
-                sender_id: data.sender_id,
-                sender_role: data.sender_role
-            });
+        await chatBaru.save();
 
-        } catch (err) {
-            console.error('Gagal menyimpan chat ke MongoDB:', err.message);
-        }
-    });
+        // Broadcast ke psikolog/mahasiswa di room yang sama
+        socket.to(data.booking_id.toString()).emit('receive_message', {
+            sender_role: data.sender_role,
+            text: data.text // Tetap kirim 'text' agar web temanmu bisa baca
+        });
+
+    } catch (error) {
+        console.error("Gagal simpan ke MongoDB:", error);
+    }
+});
 
     socket.on('disconnect', () => {
         console.log('Pengguna keluar dari chat');
@@ -76,6 +76,16 @@ io.on('connection', (socket) => {
 // Root route checking
 app.get('/', (req, res) => {
     res.json({ message: "Server Sistem Konseling Mahasiswa Berjalan Lancar (Database 5 Tabel & MongoDB Active)!" });
+});
+
+app.get('/api/chat/:booking_id', async (req, res) => {
+    try {
+        const chats = await Chat.find({ booking_id: req.params.booking_id })
+                                .sort({ timestamp: 1 }); 
+        res.json(chats);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // Jalankan Server

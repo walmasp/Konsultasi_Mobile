@@ -79,11 +79,11 @@ router.get('/mahasiswa/:id', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// 12. Get Riwayat Booking Masuk Psikolog (Web Admin) -> READ
+// 12. Get Riwayat Booking Masuk Psikolog (Web Admin) -> READ - PERBAIKAN ALIAS USERNAME
 router.get('/psikolog/:id', async (req, res) => {
     try {
         const [rows] = await db.query(`
-            SELECT b.*, j.tanggal, j.jam_mulai, u.username as nama_samaran_mhs 
+            SELECT b.*, j.tanggal, j.jam_mulai, u.username as username 
             FROM booking_sesi b
             JOIN jadwal_sesi j ON b.jadwal_id = j.id
             JOIN users u ON b.mahasiswa_id = u.id
