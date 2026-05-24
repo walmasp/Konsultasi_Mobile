@@ -3,7 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiClient {
   // Gunakan 10.0.2.2 untuk Emulator Android, atau IP Wi-Fi Laptop (misal: 192.168.1.15) untuk HP Fisik
-  static const String baseUrl = 'http://192.168.100.76:3000/api'; 
+  static const String baseUrl = 'https://be-mobile-service-203664327381.asia-southeast2.run.app'; 
   
   final Dio dio = Dio(
     BaseOptions(
